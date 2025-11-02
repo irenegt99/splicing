@@ -7,3 +7,9 @@ submissions/
 .snakemake/
 ._*
 scripts/manual_runs.R
+*.csv
+workflows\annotate.smk
+workflows\transcriptome_assembly.smk
+example_data\example_config.csv
+
+config\config.yaml
