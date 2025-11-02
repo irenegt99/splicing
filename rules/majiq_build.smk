@@ -1,65 +1,95 @@
 import pandas as pd
 import os
-import subprocess
 import yaml
-# note to self - probaly should not be hard coding threads like i do
+
 configfile: "config/config.yaml"
-include: "helpers.py"
-localrules: create_majiq_config_file
-#reading in the samples and dropping the samples to be excluded in order to get a list of sample names
+include: "../rules/helpers.py"
+
+# read samples
 samples = pd.read_csv(config['sampleCSVpath'])
 samples2 = samples.loc[samples.exclude_sample_downstream_analysis != 1]
-SAMPLE_NAMES = list(set(samples2['sample_name'] + config['bam_suffix']))
-GROUPS = list(set(samples2['group']))
+
+SAMPLE_NAMES = list(set(samples2['sample_name']))
+BAM_SUFFIX = config['bam_suffix']
 MAJIQ_DIR = get_output_dir(config['project_top_level'], config['majiq_top_level'])
 
+# paths
+ANNOTATION_DB = os.path.join(MAJIQ_DIR, "annotations", "sg.zarr")
+CONFIG_TSV = os.path.join(MAJIQ_DIR, config['run_name'] + "_majiqConfig.tsv")
+SJ_DIR = os.path.join(MAJIQ_DIR, "sj")
+BUILDER_DB = os.path.join(MAJIQ_DIR, "builder", "sg.zarr")
 
-rule all:
-    input:
-        MAJIQ_DIR + config['run_name'] + "_majiqConfig.tsv",
-        expand(os.path.join(MAJIQ_DIR,"builder",'{name}' + ".sj"),name = SAMPLE_NAMES),
-        os.path.join(MAJIQ_DIR,"builder/splicegraph.sql")
-        
-# # this rule creats the majiq configuration file that is required uses a helper function
+
+# 1. Create groups.tsv with  SJ
 rule create_majiq_config_file:
     input:
         config['sampleCSVpath']
     output:
-        majiq_config = MAJIQ_DIR + config['run_name'] + "_majiqConfig.tsv"
-    # use config.yaml and samples.tsv to make MAJIQ file
+        CONFIG_TSV
     run:
-        conditions_bams_parsed = parse_sample_csv_majiq(config['sampleCSVpath'])
-        options = [
-            "[info]",
-            "bamdirs=" + config['bam_dir'],
-            "genome=" + config['genome_refcode'],
-            "strandness=none",
-            "[experiments]"]
+        df = pd.read_csv(input[0])
+        df = df.loc[df.exclude_sample_downstream_analysis != 1]
 
-        options += conditions_bams_parsed
-        with open(output.majiq_config,"w") as outfile:
-            for opt in options:
-                outfile.write(opt + "\n")
+        with open(output[0], "w") as f:
+            f.write("group\tprefix\tsj\n")
+            for _, row in df.iterrows():
+                sj_path = os.path.join(SJ_DIR, row['sample_name'] + ".sj") + "/"
+                f.write(f"{row['group']}\t{row['sample_name']}\t{sj_path}\n")
 
-rule majiq_build:
+
+# 2. Convert GFF3 into anotations base
+rule majiq_gff3:
     input:
-        majiq_config_file = MAJIQ_DIR + config['run_name'] + "_majiqConfig.tsv"
-    output:
-        expand(os.path.join(MAJIQ_DIR,"builder",'{name}' + ".sj"),name = SAMPLE_NAMES),
-        os.path.join(MAJIQ_DIR,"builder/splicegraph.sql"),
-        os.path.join(MAJIQ_DIR,"builder/builder_done")
-    conda:
-        'majiq'
-    threads:
-            4
-    params:
-        majiq_path = config['majiq_path'],
         gff3 = config['gff3'],
-        majiq_builder_output = os.path.join(MAJIQ_DIR,"builder"),
-        majiq_extra_parameters = return_parsed_extra_params(config['majiq_extra_parameters'])
+        fasta = config['fasta']
+    output:
+        directory(ANNOTATION_DB) 
+    params:
+        outdir = lambda wildcards, output: os.path.dirname(output[0])
     shell:
         """
-        mkdir -p {params.majiq_builder_output}
-        {params.majiq_path} build {params.gff3} -c {input.majiq_config_file} -j {threads} -o {params.majiq_builder_output}{params.majiq_extra_parameters}
-        touch {params.majiq_builder_output}/builder_done
+        mkdir -p {params.outdir}
+        {config[majiq_path]} gff3 \
+            --license /SAN/vyplab/transcriptomic_mad_ms_tdp43/licence/majiq_license_academic_official.lic \
+            {input.gff3} \
+            {output}
+        """
+
+
+# 3. Convert BAM to SJ per sample
+rule majiq_sj:
+    input:
+        bam = os.path.join(config['bam_dir'], "{sample}" + BAM_SUFFIX),
+        annotation = ANNOTATION_DB
+    output:
+        directory(os.path.join(SJ_DIR, "{sample}.sj"))
+    threads: 2
+    resources:
+        mem_mb = 32000
+    params:
+        outdir = SJ_DIR
+    shell:
+        """
+        mkdir -p {params.outdir}
+        {config[majiq_path]} sj --license /SAN/vyplab/transcriptomic_mad_ms_tdp43/licence/majiq_license_academic_official.lic {input.bam} {input.annotation} {output}
+        """
+
+
+
+# 4. Run majiq build with the SJs and config.tsv
+rule majiq_build:
+    input:
+        annotation = ANNOTATION_DB,
+        config_tsv = CONFIG_TSV
+    output:
+        directory(BUILDER_DB)
+    threads: 4
+    shell:
+        """
+        mkdir -p $(dirname {output})
+        {config[majiq_path]} build \
+          --license /SAN/vyplab/transcriptomic_mad_ms_tdp43/licence/majiq_license_academic_official.lic \
+          {input.annotation} \
+          {output} \
+          --groups-tsv {input.config_tsv}
         """

@@ -1,0 +1,16 @@
+name: majiq_v3
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - pandas
+  - pysam
+  - snakemake
+  - pip:
+      - cython
+      - setuptools==58.5.3
+      - wheel

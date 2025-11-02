@@ -4,12 +4,14 @@
 
 #$ -cwd
 #$ -V
-#$ -l h_vmem=8G,h_rt=20:00:00,tmem=8G
+#$ -l h_vmem=32G,h_rt=20:00:00,tmem=32G
 #$ -pe smp 2
 
 # join stdout and stderr output
 #$ -j y
 #$ -R y
+
+export MAJIQ_LICENSE_FILE=/SAN/vyplab/transcriptomic_mad_ms_tdp43/licence/majiq_license_academic_official.lic
 
 WORKFLOW="workflows/${1}.smk"
 

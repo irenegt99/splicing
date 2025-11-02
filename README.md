@@ -1,20 +1,21 @@
 # splicing
-Splicing done with MAJIQ tool **still a work in progress**
-The purpose of this pipeline is to be able to run MAJIQ using Snakemake. The aim is to make MAJIQ easier to run for non-bioinformaticians and it produces additional parsing and annotation to the MAJIQ output.
+Is an actualization of https://github.com/frattalab/splicing: Splicing done with MAJIQ tool version 3
+**work in progress**.
 
 *BEWARE*
 
-I am actively developing how this pipeline works - for now it runs in 4 steps
+Actively developing how this pipeline works - now it runs in 2 steps:
 
 1. build
 2. psi
-3. annotate
-4. transcriptome_assembly
+And add annonation to the diferents events with just running a Rscript.
+
+# Installation majiq v3
 
 After going through several different installation methods for majiq, I found that the easiest/most reliable seems to be installing
-majiq in a conda environment named "majiq"
+majiq in a conda environment named "majiq". Therefore, this pipeline assumes that you have a named conda environment called "majiq", which has majiq installed in it. As of August 19 2025 - This pipeline is using `majiq v3`
 
-therefore, this pipeline assumes that you have a named conda environment called "majiq", which has majiq installed in it. As of Mar 02 2023 - this pipeline is using `majiq 2.4.dev4+gdd43612`
+https://biociphers.bitbucket.io/majiq-docs/getting-started-guide/installing.html
 
 Transcriptome assembly will merge the bams and then 2 different transcriptome assembly tools, scallop2, and stringtie2 - and then extract the novel exons that match to significant junctions called by MAJIQ
 
@@ -60,22 +61,18 @@ Here is an example sample sheet where we have a het, hom, and wt of a mutant
 
 | sample_name | group | exclude_sample_downstream_analysis | litter |
 |-------------|-------|------------------------------------|--------|
-| M323K_HET_1 | het   |                                    | one    |
-| M323K_HET_2 | het   |                                    | two    |
-| M323K_HET_3 | het   |                                    | three  |
-| M323K_HET_4 | het   |                                    | four   |
-| M323K_HOM_1 | hom   |                                    | one    |
-| M323K_HOM_2 | hom   |                                    | two    |
-| M323K_HOM_3 | hom   |                                    | three  |
-| M323K_HOM_4 | hom   |                                    | four   |
-| M323K_HOM_5 | hom   |                                    | five   |
+| M323K_HOM_1 | mut   |                                    | one    |
+| M323K_HOM_2 | mut   |                                    | two    |
+| M323K_HOM_3 | mut   |                                    | three  |
+| M323K_HOM_4 | mut   |                                    | four   |
+| M323K_HOM_5 | mut   |                                    | five   |
 | M323K_WT_1  | wt    |                                    | one    |
 | M323K_WT_2  | wt    |                                    | two    |
 | M323K_WT_3  | wt    |                                    | three  |
 
 My bams are named like this:
 
-`M323K_HET_1_unique_rg_fixed.bam`
+`M323K_mut_1_unique_rg_fixed.bam`
 
 with all bams sharing the `_unique_rg_fixed` suffix, but I don't include that in the `sample_name`.
 
@@ -95,8 +92,8 @@ That means NO hyphens and NO periods.
 
 | sample_name | group | exclude_sample_downstream_analysis | litter |
 |-------------|-------|------------------------------------|--------|
-| M323K_HET_1 | het   |                                    | 1.2    | - NO
-| M323K_HET_2 | het   |                                    | two_2    | - YES
+| M323K_MUT_1 | mutt   |                                    | 1.2    | - NO
+| M323K_MUT_2 | mut   |                                    | two_2    | - YES
 
 ## Setting up your comparisons
 
@@ -111,14 +108,7 @@ knockdownexperiment:
   wt:
     - wt
   hom:
-    - hom
-controlVersusHets:
-  column_name:
-    - group
-  wt:
-    - wt
-  het:
-    - het
+    - MUT
 litterComparison:
   column_name:
     - litter
@@ -142,51 +132,32 @@ Underneath the folder in
 ```
 majiq
 ├── builder
-│   ├── wt_sample1.majiq
+│   ├── sg.zarr
+├── annotations
+│   ├── sg.zarr
+├── sj
 │   ├── wt_sample1.sj
-│   ├── wt_sample2.majiq
 │   ├── wt_sample2.sj
-│   ├── mut_sample1.majiq
 │   ├── mut_sample1.sj
-│   ├── mut_sample2.majiq
-│   ├── mut_sample2.sj
-│   ├── majiq.log
-│   └── splicegraph.sql
+│   └── mut_sample2.sj
 ├── delta_psi
 │   ├── wt_mut.deltapsi.tsv
-│   ├── wt_mut.deltapsi.voila
-│   └── deltapsi_majiq.log
-├── delta_psi_voila_tsv
-│   ├── wt_mut.junctions.bed
-│   ├── wt_mut.csv
-│   ├── wt_mut.gff3
-│   ├── wt_mut_parsed_psi.tsv
-│   └── wt_mut.psi.tsv
+│   └── wt_mut.dpsicov
 ├── run_name_majiqConfig.tsv
 ├── psi_single
-│   ├── wt_sample1.tsv
+│   ├── wt_sample1.psicov
 │   ├── wt_sample1.voila
-│   ├── wt_sample2.tsv
+│   ├── wt_sample2.psicov
 │   ├── wt_sample2.voila
-│   ├── mut_sample1.tsv
+│   ├── mut_sample1.psicov
 │   ├── mut_sample1.voila
-│   ├── mut_sample2.tsv
-│   ├── mut_sample2.voila
-├── psi_voila_tsv_singlehis
-│   ├── wt_sample1.tsv
-│   ├── wt_sample1.voila
-│   ├── wt_sample2.tsv
-│   ├── wt_sample2.voila
-│   ├── mut_sample1.tsv
-│   ├── mut_sample1.voila
-│   ├── mut_sample2.tsv
+│   ├── mut_sample2.psicov
 │   ├── mut_sample2.voila
 └── psi
     ├── wt.psi.tsv
-    ├── wt.psi.voila
+    ├── wt.psi.psicov
     ├── mut.psi.tsv
-    ├── mut.psi.voila
-    └── psi_majiq.log
+    └── mut.psi.psicov
 ```
 ## Submitting on SGE
 
@@ -194,8 +165,7 @@ majiq
 `source submit.sh build run_name`
 2. PSI step
 `source submit.sh psi run_name`
-3. annotate step
-`source submit.sh annotate run_name`
+
 with whatever run name you'd like
 
 ## Submitting on Slurm
@@ -210,11 +180,9 @@ with whatever run name you'd like
 If you don't have a cluster, you can run straight with snakemake
 `snakemake -s workflows/build.smk`
 `snakemake -s workflows/psi.smk`
-`snakemake -s workflows/annotate.smk`
 
-
-
-
+# Add annonation to the diferents events (annotated, ambig_gene, novel_acceptor, novel_donor, novel_combo, novel exon_skip)
+`Rscript add_junction_annotations_command_line.R   -d  /majiq/deltapsi/wt_mut.deltapsi.tsv     -o  /majiq/deltapsi/wt_mut_annotated_cmd    -g reference gtf (same that in the config file)`
 
 ## Annotation of splicing events
 Annotation is done with a function grabbed directly from source code here:

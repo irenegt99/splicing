@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import yaml
-
+import numpy as np
 def return_bed_and_bases(bases,contrasts,output_dirs):
     #I want to zip bases with contrasts
     zipped_comparisons = [x+"-"+str(y)+"_cryptic_exons.bed" for x,y in zip(bases,contrasts)]
@@ -44,26 +44,21 @@ def return_sample_names_group(grp):
     return("","")
 
 def parse_sample_csv_majiq(sampleCSVpath):
-    """this function takes in the sample csv path and returns a string of
-    group and samples with whatever the bam suffix is for the processed bams
-    for building a majiq config file from the standard sample csv file used
-    by the rna seq pipeline
     """
-    samples = pd.read_csv(config['sampleCSVpath'])
-    #there should be a column which allows you to exclude samples
+    Devuelve una lista de strings con formato group=sj1,sj2... a partir del CSV de muestras.
+    """
+    samples = pd.read_csv(sampleCSVpath)
     samples2 = samples.loc[samples.exclude_sample_downstream_analysis != 1]
-    #we're making a dictionary here where each group is the key and all the sample_names
-    #in that group are the items then we append the bam_suffix from the config
     temp_dict = (samples2.groupby('group')
-              .apply(lambda x: set(x['sample_name'] + config['bam_suffix']))
-              .to_dict())
-    #now we make an empty list, and then fill it up with the values in the dictionary
-    #so that the end result looks like group=samplename_bam_suffix,samplename_bam_suffix, etc
-    conditions_bams_parsed = []
-    for key in temp_dict:
-        conditions_bams_parsed.append(key + "=" + ','.join(temp_dict[key]))
+                 .apply(lambda x: set(x['sample_name'] + ".sj"))
+                 .to_dict())
 
-    return(conditions_bams_parsed)
+    conditions_sjs_parsed = []
+    for key in temp_dict:
+        conditions_sjs_parsed.append(key + "=" + ','.join(temp_dict[key]))
+
+    return conditions_sjs_parsed
+
 
 def return_parsed_extra_params(extra_params):
     """this function takes extra parameters for a given tool from the config file and parses it
@@ -82,44 +77,30 @@ def return_parsed_extra_params(extra_params):
             cmd += " --{0}".format(key)
     return(cmd)
 def majiq_files_by_group(grp):
-    """
-    given a particular group, return all the majiq files for that group using the samples csv file
-    """
     samples = pd.read_csv(config['sampleCSVpath'])
-    #there should be a column which allows you to exclude samples
     samples2 = samples.loc[samples.exclude_sample_downstream_analysis != 1]
-    #read in the comparisons and make a dictionary of comparisons, comparisons needs to be in the config file
-    compare_dict = load_comparisons()
     MAJIQ_DIR = get_output_dir(config['project_top_level'], config['majiq_top_level'])
 
-    majiq_files = [os.path.join(MAJIQ_DIR,"builder",x) for x in list(samples2.loc[samples2.group == grp].sample_name + config['bam_suffix'] + ".majiq")]
+    # en v3 cada muestra tiene su .sj en "sj/"
+    majiq_files = [os.path.join(MAJIQ_DIR, "sj", x + ".sj")
+                   for x in list(samples2.loc[samples2.group == grp].sample_name)]
 
     return(majiq_files)
 
+
 def majiq_files_from_contrast(grp):
-    """
-    given a contrast name or list of groups return a list of the files in that group
-    """
-    #reading in the samples
     samples = pd.read_csv(config['sampleCSVpath'])
-    #there should be a column which allows you to exclude samples
     samples2 = samples.loc[samples.exclude_sample_downstream_analysis != 1]
-    #read in the comparisons and make a dictionary of comparisons, comparisons needs to be in the config file
-    compare_dict = load_comparisons()
-    #go through the values of the dictionary and break when we find the right groups in that contrast
     grps, comparison_column = return_sample_names_group(grp)
-    #take the sample names corresponding to those groups
     if comparison_column == "":
         print(grp)
         return([""])
     grp_samples = list(set(list(samples2[samples2[comparison_column].isin(grps)].sample_name)))
     MAJIQ_DIR = get_output_dir(config['project_top_level'], config['majiq_top_level'])
 
-    #build a list with the full path from those sample names
-    majiq_files = [os.path.join(MAJIQ_DIR,"builder",x + config['bam_suffix'] + ".majiq") \
-                   for x in grp_samples]
-    majiq_files = list(set(majiq_files))
-    return(majiq_files)
+    majiq_files = [os.path.join(MAJIQ_DIR, "sj", x + ".sj") for x in grp_samples]
+    return(list(set(majiq_files)))
+
 
 def sample_names_from_contrast(grp):
     """
@@ -183,14 +164,46 @@ def return_bases_and_contrasts():
     base_keys = []
     contrast_keys = []
 
-    for key in compare_dict:
-        temp = compare_dict[key]
-        for ind, k2 in enumerate(temp):
-            if ind == 1:
-                base_keys.append(k2)
-            if ind == 2:
-                contrast_keys.append(k2)
-    return(base_keys,contrast_keys)
+    for comp in compare_dict.values():
+        # Ignorar "column_name" y quedarnos solo con los grupos
+        groups = [k for k in comp.keys() if k != "column_name"]
+
+        if len(groups) == 2:
+            base, contrast = groups
+            if base != contrast:   # evitar comparar el mismo grupo
+                base_keys.append(base)
+                contrast_keys.append(contrast)
+
+    return base_keys, contrast_keys
+
+def return_comparison_pairs():
+    """
+    Returns explicit (base, contrast) pairs from comparisons.yaml
+    """
+    comparisons = "config/comparisons.yaml"
+    with open(comparisons, "r") as stream:
+        compare_dict = yaml.safe_load(stream)
+
+    pairs = []
+    for comp in compare_dict.values():
+        # saca solo los valores de los grupos, ignorando column_name
+        groups = []
+        for key, vals in comp.items():
+            if key != "column_name":
+                groups.append(vals[0])  # coge el valor de la lista, ej: "wt_lfd"
+
+        if len(groups) == 2:
+            base, contrast = groups
+            if base != contrast:
+                pairs.append((base, contrast))
+            else:
+                print(f" ignorado par duplicado: {base}-{contrast}")
+        else:
+            print(f" comparacion mal definida en YAML: {comp}")
+
+    # elimina duplicados por si acaso
+    pairs = list(set(pairs))
+    return pairs
 
 def get_single_psi_parsed_files():
     """

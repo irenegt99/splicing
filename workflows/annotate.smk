@@ -19,15 +19,15 @@ GROUPS = list(set(samples2['group']))
 
 BASES, CONTRASTS = return_bases_and_contrasts()
 MAJIQ_DIR = get_output_dir(config['project_top_level'], config['majiq_top_level'])
+CONTRAST_PAIRS = return_comparison_pairs()
 
 rule allAnnotations:
     input:
-        # expand(os.path.join(MAJIQ_DIR,"modulizers","{bse}-{contrast}", "junctions.tsv"),zip, bse = BASES,contrast = CONTRASTS),
-        expand(os.path.join(MAJIQ_DIR,"psi_voila_tsv_single",'{sample}' + "_parsed.csv"), sample = SAMPLE_NAMES),
-        expand(os.path.join(MAJIQ_DIR,"psi_voila_tsv",'{group}' + "_parsed.csv"), group = GROUPS),
-        expand(os.path.join(MAJIQ_DIR,"delta_psi_voila_tsv","{bse}-{contrast}" + "_parsed_psi.tsv"),zip, bse = BASES,contrast = CONTRASTS),
-        expand(os.path.join(MAJIQ_DIR,"delta_psi_voila_tsv","{bse}-{contrast}" + "_annotated_junctions.csv"),zip, bse = BASES,contrast = CONTRASTS),
-        expand(os.path.join(MAJIQ_DIR,"delta_psi_voila_tsv","{bse}-{contrast}_annotated.junctions.bed"),zip, bse = BASES,contrast = CONTRASTS)
+        [os.path.join(MAJIQ_DIR,"psi_voila_tsv_single", f"{s}_parsed.csv") for s in SAMPLE_NAMES],
+        [os.path.join(MAJIQ_DIR,"psi_voila_tsv", f"{g}_parsed.csv") for g in GROUPS],
+        [os.path.join(MAJIQ_DIR,"delta_psi_voila_tsv", f"{b}-{c}_parsed_psi.tsv") for b,c in CONTRAST_PAIRS],
+        [os.path.join(MAJIQ_DIR,"delta_psi_voila_tsv", f"{b}-{c}_annotated_junctions.csv") for b,c in CONTRAST_PAIRS],
+        [os.path.join(MAJIQ_DIR,"delta_psi_voila_tsv", f"{b}-{c}_annotated.junctions.bed") for b,c in CONTRAST_PAIRS]
         
 
 # include: "../rules/majiq_modulizer.smk"

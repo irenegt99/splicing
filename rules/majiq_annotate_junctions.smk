@@ -16,10 +16,14 @@ BASES, CONTRASTS = return_bases_and_contrasts()
 print(BASES)
 print(CONTRASTS)
 
+CONTRAST_PAIRS = return_comparison_pairs()
+print(CONTRAST_PAIRS)
+
+
 rule allAnnotated:
     input:
-        expand(os.path.join(MAJIQ_DIR,"delta_psi_voila_tsv","{bse}-{contrast}" + "_annotated_junctions.csv"),zip, bse = BASES,contrast = CONTRASTS),
-        expand(os.path.join(MAJIQ_DIR,"delta_psi_voila_tsv","{bse}-{contrast}_annotated.junctions.bed"),zip, bse = BASES,contrast = CONTRASTS)
+        [os.path.join(MAJIQ_DIR,"delta_psi_voila_tsv", f"{b}-{c}_annotated_junctions.csv") for b,c in CONTRAST_PAIRS],
+        [os.path.join(MAJIQ_DIR,"delta_psi_voila_tsv", f"{b}-{c}_annotated.junctions.bed") for b,c in CONTRAST_PAIRS]
 
 rule annotatate_delta:
     input:

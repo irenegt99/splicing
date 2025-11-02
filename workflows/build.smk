@@ -1,24 +1,32 @@
 import pandas as pd
 import os
-import subprocess
 import yaml
-# note to self - probaly should not be hard coding threads like i do
+
 configfile: "config/config.yaml"
 include: "../rules/helpers.py"
-localrules: create_majiq_config_file
-#reading in the samples and dropping the samples to be excluded in order to get a list of sample names
+
+# read samples
 samples = pd.read_csv(config['sampleCSVpath'])
 samples2 = samples.loc[samples.exclude_sample_downstream_analysis != 1]
-SAMPLE_NAMES = list(set(samples2['sample_name'] + config['bam_suffix']))
-GROUPS = list(set(samples2['group']))
+
+SAMPLE_NAMES = list(set(samples2['sample_name']))
 MAJIQ_DIR = get_output_dir(config['project_top_level'], config['majiq_top_level'])
 
+# pathways
+ANNOTATION_DB = os.path.join(MAJIQ_DIR, "annotations", "sg.zarr")
+CONFIG_TSV = os.path.join(MAJIQ_DIR, config['run_name'] + "_majiqConfig.tsv")
+SJ_FILES = expand(os.path.join(MAJIQ_DIR, "sj", "{sample}.sj"), sample=SAMPLE_NAMES)
+BUILDER_DB = os.path.join(MAJIQ_DIR, "builder", "sg.zarr")
 
+
+# principal rule
 rule allBuild:
     input:
-        MAJIQ_DIR + config['run_name'] + "_majiqConfig.tsv",
-        expand(os.path.join(MAJIQ_DIR,"builder",'{name}' + ".sj"),name = SAMPLE_NAMES),
-        os.path.join(MAJIQ_DIR,"builder/splicegraph.sql")
+        CONFIG_TSV,
+        ANNOTATION_DB,
+        SJ_FILES,
+        BUILDER_DB
 
 
+# include majiq rules
 include: "../rules/majiq_build.smk"

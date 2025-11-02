@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-library("optparse")
+library(optparse)
 library(GenomicRanges)
 library(tidyverse)
 ####util funcitons####
@@ -372,9 +372,11 @@ final_annotate_junctions <- function(parsed_file,output_filepath,gtf){
 
 
     parsed_granges = makeGRangesFromDataFrame(parsed_splicing,
-                                            start.field = "junc_start",
-                                            end.field = "junc_end",
-                                            keep.extra.columns = TRUE)
+                                              seqnames.field = "seqid",
+                                              start.field    = "start",    
+                                              end.field      = "end",       
+                                              strand.field   = "strand",    
+                                              keep.extra.columns = TRUE)
     #remove any junctions with width less than 2
     keep_rows = which(!(width(parsed_granges) < 2))
     parsed_granges = parsed_granges[keep_rows]

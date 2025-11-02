@@ -18,9 +18,12 @@ print(BASES)
 print(CONTRASTS)
 MAJIQ_DIR = get_output_dir(config['project_top_level'], config['majiq_top_level'])
 
+CONTRAST_PAIRS = return_comparison_pairs()
+print(CONTRAST_PAIRS)
+
 rule allPSI:
     input:
-        expand(os.path.join(MAJIQ_DIR,"modulizers","{bse}-{contrast}", "junctions.tsv"),zip, bse = BASES,contrast = CONTRASTS)
+        [os.path.join(MAJIQ_DIR,"modulizers", f"{b}-{c}", "junctions.tsv") for b,c in CONTRAST_PAIRS]
 
 rule majiq_delta_modulizer:
     input:

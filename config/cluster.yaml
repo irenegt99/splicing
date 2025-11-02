@@ -1,7 +1,7 @@
 __default__:
     submission_string: " "
-    h_vmem:   1G
-    tmem:   1G
+    h_vmem:   8G
+    tmem:   8G
     h_rt: 72:00:00
 annotatate_delta:
     h_vmem:   24G
@@ -22,7 +22,7 @@ write_junctions_beds:
     tmem:   4G
     h_rt: 12:00:00
 majiq_build:
-    submission_string: "-pe smp 4 -R y"
+    submission_string: "-pe smp 2 -R y"
     h_vmem:   16G
     tmem:   16G
     h_rt: 12:00:00
